@@ -1,0 +1,8 @@
+git:
+  tag: true
+  push: true
+
+llm:
+  provider: ollama
+  model: qwen3.8:latest
+  base_url: http://localhost:11434/v1
