@@ -3,17 +3,17 @@
 require 'test_helper'
 
 class ShipkitReleaseCommandTest < Minitest::Test
-  def test_bumps_the_patch_version_from_the_latest_tag
-    git, calls = fake_git(tags: "v1.2.3\nv1.2.2\nv1.0.0")
-    version_file = fake_version_file
+  def test_bumps_the_patch_version_from_the_version_file_when_it_is_ahead_of_the_latest_tag
+    git, calls = fake_git(tags: 'v0.0.1')
+    version_file = fake_version_file(version: '0.1.0')
     config = fake_config
 
     tag = release_command('patch', git:, config:, version_file:).call
 
-    assert_equal 'v1.2.4', tag
-    assert_equal ['1.2.3'], config.previous_versions
-    assert_equal ['1.2.4'], version_file.writes
-    assert_includes calls, ['tag', '-a', 'v1.2.4', '-m', 'Release v1.2.4']
+    assert_equal 'v0.1.1', tag
+    assert_equal ['0.1.0'], config.previous_versions
+    assert_equal ['0.1.1'], version_file.writes
+    assert_includes calls, ['tag', '-a', 'v0.1.1', '-m', 'Release v0.1.1']
   end
 
   def test_bumps_the_minor_version_and_resets_patch
@@ -35,7 +35,7 @@ class ShipkitReleaseCommandTest < Minitest::Test
   def test_defaults_to_v0_0_0_when_there_are_no_existing_tags
     git, = fake_git(tags: '')
 
-    tag = release_command('patch', git:, config: fake_config).call
+    tag = release_command('patch', git:, config: fake_config, version_file: fake_version_file(version: '0.0.0')).call
 
     assert_equal 'v0.0.1', tag
   end
@@ -43,7 +43,8 @@ class ShipkitReleaseCommandTest < Minitest::Test
   def test_pushes_the_current_branch_and_the_new_tag_to_the_remote
     git, calls = fake_git(tags: 'v1.0.0')
 
-    release_command('patch', git:, remote: 'origin', config: fake_config).call
+    release_command('patch', git:, remote: 'origin', config: fake_config,
+                             version_file: fake_version_file(version: '1.0.0')).call
 
     assert_includes calls, %w[push origin HEAD]
     assert_includes calls, ['push', 'origin', 'v1.0.1']
@@ -65,7 +66,7 @@ class ShipkitReleaseCommandTest < Minitest::Test
 
   def test_skips_tagging_and_the_dirty_check_when_git_tag_is_disabled
     git, calls = fake_git(tags: 'v1.0.0', status: " M lib/foo.rb\n")
-    version_file = fake_version_file
+    version_file = fake_version_file(version: '1.0.0')
 
     tag = release_command('patch', git:, config: fake_config(tag: false), version_file:).call
 
@@ -79,7 +80,8 @@ class ShipkitReleaseCommandTest < Minitest::Test
   def test_skips_pushing_when_git_push_is_disabled
     git, calls = fake_git(tags: 'v1.0.0')
 
-    release_command('patch', git:, config: fake_config(push: false)).call
+    release_command('patch', git:, config: fake_config(push: false),
+                             version_file: fake_version_file(version: '1.0.0')).call
 
     assert_includes calls, ['tag', '-a', 'v1.0.1', '-m', 'Release v1.0.1']
     refute(calls.any? { |call| call.first == 'push' })
@@ -116,13 +118,13 @@ class ShipkitReleaseCommandTest < Minitest::Test
     end.new(tag, push, [])
   end
 
-  def fake_version_file
-    Struct.new(:writes) do
-      def version = '1.2.3'
+  def fake_version_file(version: '1.2.3')
+    Struct.new(:current_version, :writes) do
+      def version = current_version
 
       def write(version)
         writes << version
       end
-    end.new([])
+    end.new(version, [])
   end
 end
