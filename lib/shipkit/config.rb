@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "yaml"
+require 'yaml'
 
 module Shipkit
   # Loads .shipkit.yml, e.g.:
@@ -13,15 +13,21 @@ module Shipkit
   #     base_url: http://host.docker.internal:11434/
   # Set `llm: false` (or omit it) to disable LLM summarization entirely.
   class Config
-    FILE_NAME = ".shipkit.yml"
+    FILE_NAME = '.shipkit.yml'
 
     def self.load(path = FILE_NAME)
       data = File.exist?(path) ? YAML.safe_load_file(path) : nil
-      new(data || {})
+      new(data || {}, path: path)
     end
 
-    def initialize(data)
+    def initialize(data, path: FILE_NAME)
       @data = data
+      @path = path
+    end
+
+    def write_previous_version(version)
+      @data['previous_version'] = version
+      File.write(@path, YAML.dump(@data))
     end
 
     def git_tag?
