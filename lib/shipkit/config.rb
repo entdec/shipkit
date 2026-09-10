@@ -15,6 +15,8 @@ module Shipkit
   class Config
     FILE_NAME = '.shipkit.yml'
 
+    attr_reader :path
+
     def self.load(path = FILE_NAME)
       data = File.exist?(path) ? YAML.safe_load_file(path) : nil
       new(data || {}, path: path)

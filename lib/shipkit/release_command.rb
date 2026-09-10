@@ -3,7 +3,7 @@
 require 'open3'
 
 module Shipkit
-  # Bumps the project's version.rb, then tags and pushes the release (à la gem-release).
+  # Bumps, commits, tags, and pushes the project's release files (à la gem-release).
   class ReleaseCommand
     class Error < StandardError; end
 
@@ -24,7 +24,7 @@ module Shipkit
       current_version = @version_file.version
       tag = "v#{bump_version(current_version)}"
 
-      raise Error, 'working tree has uncommitted changes' if @config.git_tag? && dirty?
+      raise Error, 'working tree has uncommitted changes' if dirty?
 
       begin
         @config.write_previous_version(current_version)
@@ -33,12 +33,13 @@ module Shipkit
         raise Error, e.message
       end
 
+      @git.call('add', @version_file.path, @config.path)
+      @git.call('commit', '-m', "Release #{tag}")
+      @git.call('push', @remote, 'HEAD') if @config.git_push?
+
       @git.call('tag', '-a', tag, '-m', "Release #{tag}") if @config.git_tag?
 
-      if @config.git_push?
-        @git.call('push', @remote, 'HEAD')
-        @git.call('push', @remote, tag) if @config.git_tag?
-      end
+      @git.call('push', @remote, tag) if @config.git_push? && @config.git_tag?
 
       tag
     end

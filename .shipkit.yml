@@ -6,3 +6,4 @@ llm:
   provider: ollama
   model: qwen3.8:latest
   base_url: http://localhost:11434/v1
+previous_version: 0.1.0

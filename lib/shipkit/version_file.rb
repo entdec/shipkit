@@ -7,6 +7,8 @@ module Shipkit
 
     PATTERN = /VERSION\s*=\s*["']([^"']+)["']/
 
+    attr_reader :path
+
     def initialize(path: nil)
       @path = path || find_path
     end

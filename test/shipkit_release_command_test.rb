@@ -13,7 +13,14 @@ class ShipkitReleaseCommandTest < Minitest::Test
     assert_equal 'v0.1.1', tag
     assert_equal ['0.1.0'], config.previous_versions
     assert_equal ['0.1.1'], version_file.writes
-    assert_includes calls, ['tag', '-a', 'v0.1.1', '-m', 'Release v0.1.1']
+    assert_equal [
+      %w[status --porcelain],
+      ['add', 'lib/shipkit/version.rb', '.shipkit.yml'],
+      ['commit', '-m', 'Release v0.1.1'],
+      %w[push origin HEAD],
+      ['tag', '-a', 'v0.1.1', '-m', 'Release v0.1.1'],
+      ['push', 'origin', 'v0.1.1']
+    ], calls
   end
 
   def test_bumps_the_minor_version_and_resets_patch
@@ -50,11 +57,11 @@ class ShipkitReleaseCommandTest < Minitest::Test
     assert_includes calls, ['push', 'origin', 'v1.0.1']
   end
 
-  def test_raises_when_the_working_tree_is_dirty
+  def test_raises_when_the_working_tree_is_dirty_even_when_tagging_is_disabled
     git, = fake_git(tags: 'v1.0.0', status: " M lib/foo.rb\n")
 
     assert_raises(Shipkit::ReleaseCommand::Error) do
-      release_command('patch', git:, config: fake_config).call
+      release_command('patch', git:, config: fake_config(tag: false)).call
     end
   end
 
@@ -64,8 +71,8 @@ class ShipkitReleaseCommandTest < Minitest::Test
     end
   end
 
-  def test_skips_tagging_and_the_dirty_check_when_git_tag_is_disabled
-    git, calls = fake_git(tags: 'v1.0.0', status: " M lib/foo.rb\n")
+  def test_skips_tagging_when_git_tag_is_disabled
+    git, calls = fake_git(tags: 'v1.0.0')
     version_file = fake_version_file(version: '1.0.0')
 
     tag = release_command('patch', git:, config: fake_config(tag: false), version_file:).call
@@ -73,6 +80,7 @@ class ShipkitReleaseCommandTest < Minitest::Test
     assert_equal 'v1.0.1', tag
     assert_equal ['1.0.1'], version_file.writes
     refute(calls.any? { |call| call.first == 'tag' && call.include?('-a') })
+    assert_includes calls, ['commit', '-m', 'Release v1.0.1']
     assert_includes calls, %w[push origin HEAD]
     refute_includes calls, ['push', 'origin', 'v1.0.1']
   end
@@ -83,6 +91,7 @@ class ShipkitReleaseCommandTest < Minitest::Test
     release_command('patch', git:, config: fake_config(push: false),
                              version_file: fake_version_file(version: '1.0.0')).call
 
+    assert_includes calls, ['commit', '-m', 'Release v1.0.1']
     assert_includes calls, ['tag', '-a', 'v1.0.1', '-m', 'Release v1.0.1']
     refute(calls.any? { |call| call.first == 'push' })
   end
@@ -111,6 +120,7 @@ class ShipkitReleaseCommandTest < Minitest::Test
     Struct.new(:tag, :push, :previous_versions) do
       def git_tag? = tag
       def git_push? = push
+      def path = '.shipkit.yml'
 
       def write_previous_version(version)
         previous_versions << version
@@ -121,6 +131,7 @@ class ShipkitReleaseCommandTest < Minitest::Test
   def fake_version_file(version: '1.2.3')
     Struct.new(:current_version, :writes) do
       def version = current_version
+      def path = 'lib/shipkit/version.rb'
 
       def write(version)
         writes << version
